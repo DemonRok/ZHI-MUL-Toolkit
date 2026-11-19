@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/ZHIMulToolkit.Core/ZHIMulToolkit.Core.csproj" />
+  <Project Path="src/ZHIMulToolkit/ZHIMulToolkit.csproj" />
+  <Project Path="tests/ZHIMulToolkit.Tests/ZHIMulToolkit.Tests.csproj" />
+</Solution>

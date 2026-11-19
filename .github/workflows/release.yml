@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Validate release tag
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [[ ! "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag is not a semantic version: $tag"
+            exit 1
+          fi
+          version_without_build="${tag#v}"
+          version_without_build="${version_without_build%%+*}"
+          if [[ "$version_without_build" == *-* ]]; then
+            prerelease="${version_without_build#*-}"
+            if [[ "$prerelease" == .* || "$prerelease" == *. || "$prerelease" == *..* ]]; then
+              echo "Release tag has an empty prerelease identifier: $tag"
+              exit 1
+            fi
+            IFS='.' read -ra identifiers <<< "$prerelease"
+            for identifier in "${identifiers[@]}"; do
+              if [[ "$identifier" =~ ^[0-9]+$ && ${#identifier} -gt 1 && "$identifier" == 0* ]]; then
+                echo "Numeric prerelease identifiers cannot contain leading zeroes: $identifier"
+                exit 1
+              fi
+            done
+          fi
+          if [[ "$tag" == *+* ]]; then
+            build_metadata="${tag#*+}"
+            if [[ "$build_metadata" == .* || "$build_metadata" == *. || "$build_metadata" == *..* ]]; then
+              echo "Release tag has an empty build metadata identifier: $tag"
+              exit 1
+            fi
+          fi
+          echo "RELEASE_VERSION=${tag#v}" >> "$GITHUB_ENV"
+      - name: Restore
+        run: dotnet restore ZHIMulToolkit.slnx
+      - name: Build
+        run: dotnet build ZHIMulToolkit.slnx -c Release --no-restore -m:1 -p:Version=${{ env.RELEASE_VERSION }}
+      - name: Test
+        run: dotnet test ZHIMulToolkit.slnx -c Release --no-build -m:1 -p:Version=${{ env.RELEASE_VERSION }}
+      - name: Publish
+        run: dotnet publish src/ZHIMulToolkit/ZHIMulToolkit.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishTrimmed=false -p:Version=${{ env.RELEASE_VERSION }} -p:GitHubRepository=${{ github.repository }} -o artifacts/publish
+      - name: Verify and checksum release files
+        shell: bash
+        run: |
+          test -f artifacts/publish/ZHIMulToolkit.exe
+          if find artifacts/publish -maxdepth 1 -type f ! -name 'ZHIMulToolkit.exe' -print -quit | grep -q .; then
+            echo "Unexpected sidecar file in single-file publish output."
+            find artifacts/publish -maxdepth 1 -type f -print
+            exit 1
+          fi
+          cd artifacts/publish
+          sha256sum ZHIMulToolkit.exe > SHA256SUMS.txt
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release create "${GITHUB_REF_NAME}" artifacts/publish/ZHIMulToolkit.exe artifacts/publish/SHA256SUMS.txt --title "${GITHUB_REF_NAME}" --generate-notes

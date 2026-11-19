@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <PublishTrimmed>false</PublishTrimmed>
+    <AssemblyName>ZHIMulToolkit</AssemblyName>
+    <ApplicationIcon>Assets\ZHIMulToolkit.ico</ApplicationIcon>
+    <RootNamespace>ZHIMulToolkit</RootNamespace>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ZHIMulToolkit.Core\ZHIMulToolkit.Core.csproj" />
+    <AssemblyMetadata Include="GitHubRepository" Value="$(GitHubRepository)" />
+  </ItemGroup>
+</Project>

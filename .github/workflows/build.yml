@@ -1,0 +1,41 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore ZHIMulToolkit.slnx
+      - name: Build
+        run: dotnet build ZHIMulToolkit.slnx -c Release --no-restore -m:1
+      - name: Test
+        run: dotnet test ZHIMulToolkit.slnx -c Release --no-build -m:1
+      - name: Publish single-file executable
+        run: dotnet publish src/ZHIMulToolkit/ZHIMulToolkit.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:PublishTrimmed=false -p:Version=0.1.0-ci -p:GitHubRepository=${{ github.repository }} -o artifacts/publish
+      - name: Verify publish output
+        shell: bash
+        run: |
+          test -f artifacts/publish/ZHIMulToolkit.exe
+          if find artifacts/publish -maxdepth 1 -type f ! -name 'ZHIMulToolkit.exe' -print -quit | grep -q .; then
+            echo "Unexpected sidecar file in single-file publish output."
+            find artifacts/publish -maxdepth 1 -type f -print
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZHIMulToolkit-win-x64
+          path: artifacts/publish/ZHIMulToolkit.exe
+          if-no-files-found: error
